@@ -36,9 +36,8 @@ class DhcpStarve:
             elif pkt[DHCP].options[0][1]==6:               #6 is DHCPNAK
                 print("NAK received: ", end="")
                 print(pkt[DHCP].options[2][1].decode())    #error msg
-            elif pkt[DHCP].options[0][1]==2:               #6 is DHCPNAK
-                print("Offer received: ")
-                print(pkt[DHCP].options)    #error msg
+            elif pkt[DHCP].options[0][1]==2:               #2 is DHCPOFFER
+                print("Offer received: \n{}".format(pkt[DHCP].options))
         else:
             print(pkt.display())
 
