@@ -11,7 +11,7 @@ from ipaddress import IPv4Address
 # configuration
 LOCALIFACE = 'wlan0'
 REQUESTMAC = 'b8:27:eb:24:38:86'
-MYHOSTNAME='dupa'
+MYHOSTNAME='host'
 LOCALMAC = get_if_hwaddr(LOCALIFACE)
 LOCALMACRAW = bytes.fromhex(REQUESTMAC.replace(':',''))
 
@@ -34,7 +34,7 @@ class DhcpStarve:
                 self.starvedIPs.append(pkt[IP].dst)
                 print(str(pkt[IP].dst)+" succesfully registered")
             elif pkt[DHCP].options[0][1]==6:               #6 is DHCPNAK
-                print("NAK received: ")
+                print("NAK received: ", end="")
                 print(pkt[DHCP].options[2][1].decode())    #error msg
             elif pkt[DHCP].options[0][1]==2:               #6 is DHCPNAK
                 print("Offer received: ")
@@ -110,7 +110,7 @@ class Menu:
         self.title = "Testing tool based on Scapy"
         self.menuItemsHint = "Choose an option or press q to quit:"
         self.menuItems = menuItems
-        self.subtitle = "Written by Jarek J"
+        self.subtitle = "v0.1 written by Jarek J"
         curses.wrapper(self.drawMenu)
         
     def drawMenu(self,stdscr):
@@ -167,7 +167,7 @@ class Menu:
                 self.stdscr.addstr(self.start_y + index+4, self.start_x_title, line)
                 if index == self.menuHighlight: self.stdscr.attroff(curses.color_pair(4))
 
-            self.stdscr.addstr(self.start_y + len(self.menuItems)+6, self.start_x_title, '-' * 20)
+            self.stdscr.addstr(self.start_y + len(self.menuItems)+6, self.start_x_title, '-' * len(self.subtitle))
             self.stdscr.addstr(self.start_y + len(self.menuItems)+7, self.start_x_title, self.subtitle)
 
             #refresh and wait for input
