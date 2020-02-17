@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+   
 from scapy.all import *
 import multiprocessing 
 from time import sleep
@@ -32,6 +32,8 @@ class DhcpStarve:
                 print("Offer received: \n{}".format(pkt[DHCP].options))
             else:
                 print(pkt.display())
+            return True
+        else: return False
 
     def _sniff_wrapper(sendPacketMethod):
         '''Launches sniffing process around another passed method'''
@@ -42,7 +44,7 @@ class DhcpStarve:
             sendPacketMethod(self, *args, **kwargs)
             sleep(0.5)
             listenProcess.terminate()
-            input('Press any key to come back to menu.')
+            input('Press Enter to come back to menu.')
         return wrapper  
  
     @_sniff_wrapper
@@ -78,7 +80,7 @@ class DhcpStarve:
     def sniffing(self):
         '''Just snffing with _sniff_wrapper method '''
         print('Starting sniffing for DHCP packets on interface: {} for 60 sec'.format(LOCALIFACE))
-        input('Press any key to stop')
+        input('Press Enter to stop')
     
     def nextIP(self,startIP,limit):
         '''Provides next ip addresses from some start IP, number of given addresses is limited'''
