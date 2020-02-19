@@ -1,0 +1,26 @@
+# Django
+# Version: 1.0
+FROM ubuntu
+# Install Python and Package Libraries
+RUN apt-get update && apt-get upgrade -y && apt-get autoremove && apt-get autoclean
+RUN apt-get install -y \
+    net-tools \
+	python3.6 \
+	python3-pip \
+	iputils-ping \
+	tcpdump \
+    vim
+
+# Project Files and Settings
+
+RUN mkdir /root/test
+RUN mkdir /root/mapped_project_dir
+COPY requirements.txt /root/test/requirements.txt
+COPY dhcpTester.py /root/test/dhcpTester.py
+WORKDIR /root/test
+RUN pip3 install -r requirements.txt
+
+# Server
+STOPSIGNAL SIGINT
+CMD tail -f /dev/null
+

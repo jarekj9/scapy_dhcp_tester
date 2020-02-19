@@ -1,0 +1,40 @@
+version: "2"
+services:
+  dhcpServer:
+    container_name: dhcpserver
+    restart: unless-stopped
+    image: joebiellik/dhcpd
+    stdin_open: true
+    tty: true
+    ports:
+      - "8022:22"
+    networks:
+      net1:
+        ipv4_address: 172.18.1.10
+    volumes:
+    # Config pass through
+    - ./dhcpd.conf:/etc/dhcp/dhcpd.conf
+  dhcpAttacker:
+    container_name: dhcpattacker
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile_dhcpAttacker
+    image: dhcpattacker
+    stdin_open: true
+    tty: true
+    ports:
+      - "8122:22"
+    networks:
+      net1:
+        ipv4_address: 172.18.1.11
+    volumes:
+    # Test script path is mapped to folder above dockerfiles
+    - ../:/root/mapped_project_dir
+
+networks:
+  net1:
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.18.1.0/24
