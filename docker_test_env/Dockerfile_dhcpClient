@@ -1,0 +1,7 @@
+FROM alpine:latest
+RUN apk add --no-cache dhcp
+RUN ["touch", "/var/lib/dhcp/dhcpd.leases"]
+RUN echo 'egrep "lease|hostname|hardware|\}" /var/lib/dhcp/dhcpd.leases' >> checkLeases.sh
+VOLUME ["/etc/dhcp"]
+CMD ["/usr/sbin/dhcpd", "-4", "-f", "-d", "--no-pid", "-cf", "/etc/dhcp/dhcpd.conf"]
+
