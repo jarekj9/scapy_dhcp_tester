@@ -21,17 +21,22 @@ optional arguments:
 ```
 
 Options:
-    DHCP Starve
-    It will ask for start ip (first ip to request) and limit (number of subsequent ip addresses to request).
+1. DHCP Starve
 
-1. DHCP Spoof
-    It will start a fake DHCP server (does not hold leases). It will ask for first ip in a fake DHCP pool.
+It will ask for start ip (first ip to request) and limit (number of subsequent ip addresses to request).
 
-2. DHCP Discover
-    It will send DHCP DISCOVER packet (and display response, if it comes)
+2. DHCP Spoof
 
-3. Sniff for DHCP Packets
-    Display DHCP options for every DHCP packet it sees.
+It will start a fake DHCP server (does not hold leases). It will ask for first ip in a fake DHCP pool.
+
+3. DHCP Discover
+
+It will send DHCP DISCOVER packet (and display response, if it comes)
+
+4. Sniff for DHCP Packets
+
+Display DHCP options for every DHCP packet it sees.
+
 
 
 
