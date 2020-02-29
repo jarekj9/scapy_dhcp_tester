@@ -243,7 +243,7 @@ class Menu:
                 
             #print big ascii title
             for y, line in enumerate(ASCIITITLE.splitlines(), 2):
-                self.stdscr.addstr(y, 2, line)
+                self.stdscr.addstr(self.start_y+y, self.start_x_title-35, line)
 
             # print texts
             self.stdscr.attron(curses.color_pair(2))

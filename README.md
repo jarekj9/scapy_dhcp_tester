@@ -3,6 +3,21 @@ My simple tool to test DHCP servers, written with scapy module. Menu has been ma
 
 Need to run as root because scapy needs access to interfaces.
 
+
+
+jarek@Elitebook:~/skrypty/scapy/dhcpTester$ sudo ./dhcpTester.py --help
+usage: dhcpTester.py [-h] [--dev DEV] [--ip IP] [--mac MAC]
+
+Needs to run as root. Program will try to autodetect network interface, IP and
+MAC, but you may specify it with arguments during launch.
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --dev DEV   Interface name, example: eth0
+  --ip IP     Local interface IP address
+  --mac MAC   Local interface MAC address
+
+
 Options:
 
 DHCP Starve
