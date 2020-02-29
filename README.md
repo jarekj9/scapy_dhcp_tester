@@ -1,5 +1,6 @@
 # scapy_dhcp_tester
 My simple tool to test DHCP servers, written with scapy module. Menu has been made with 'curses'.
+I have tested it on Linux Mint, Rasbian, Cent OS, Ubuntu.
 
 Need to run as root because scapy needs access to interfaces.
 
