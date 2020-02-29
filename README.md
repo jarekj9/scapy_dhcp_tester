@@ -21,18 +21,18 @@ optional arguments:
 ```
 
 Options:
-
     DHCP Starve
     It will ask for start ip (first ip to request) and limit (number of subsequent ip addresses to request).
 
-DHCP Spoof
+1. DHCP Spoof
     It will start a fake DHCP server (does not hold leases). It will ask for first ip in a fake DHCP pool.
 
-DHCP Discover
+2. DHCP Discover
     It will send DHCP DISCOVER packet (and display response, if it comes)
 
-Sniff for DHCP Packets
+3. Sniff for DHCP Packets
     Display DHCP options for every DHCP packet it sees.
+
 
 
 ```docker_test_env``` contains setup for testing environment in docker (for DHCP Starve function):

@@ -383,8 +383,8 @@ def configuration():
     IP and MAC, but you may specify it with arguments during launch.')
    
     parser.add_argument('--dev', default=network_data.get('dev'), help='Interface name, example: eth0')
-    parser.add_argument('--ip',  default=network_data.get('ip'),  help='Local interface IP address')
-    parser.add_argument('--mac', default=network_data.get('mac'), help='Local interface MAC address')
+    parser.add_argument('--ip',  default=network_data.get('ip'),  help='Local interface IP address, example: 192.168.1.10')
+    parser.add_argument('--mac', default=network_data.get('mac'), help='Local interface MAC address, example: 84:3a:4b:23:cb:3c')
     args = parser.parse_args()
     
     for arg in vars(args).values():
