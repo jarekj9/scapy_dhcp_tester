@@ -21,13 +21,18 @@ optional arguments:
 ```
 
 Options:
+
+
 1. DHCP Starve
 
 It will ask for start ip (first ip to request) and limit (number of subsequent ip addresses to request).
+Then it will proceed to request for next ip addresses and in the end it will print the addresses, for which it has seen the ACK.
+Eventually the DHCP address pool on the server may be depleted.
 
 2. DHCP Spoof
 
 It will start a fake DHCP server (does not hold leases). It will ask for first ip in a fake DHCP pool.
+If it sees DHCP DISCOVER, it will OFFER an address to that client. If Client sends the REQUEST, then server will ACK the operation and will listen for next requests.
 
 3. DHCP Discover
 
