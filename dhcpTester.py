@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 from argparse import ArgumentParser
 from scapy.all import sniff,sendp,Ether,get_if_hwaddr,IP,UDP,BOOTP,DHCP,RandString,RandInt
 from threading import Thread, Event
@@ -265,9 +265,9 @@ class Menu:
             self.stdscr.attron(curses.color_pair(1))
             self.stdscr.addstr(self.start_y + len(self.menuItems)+6, self.start_x_title, 'Using interface (can be set with cli arguments):')
             self.stdscr.attroff(curses.color_pair(1))
-            self.stdscr.addstr(self.start_y + len(self.menuItems)+7, self.start_x_title, 'NIC:{}'.format(LOCALIFACE))
-            self.stdscr.addstr(self.start_y + len(self.menuItems)+8, self.start_x_title, 'IP:{}'.format(LOCALIP))
-            self.stdscr.addstr(self.start_y + len(self.menuItems)+9, self.start_x_title, 'MAC:{}'.format(REQUESTMAC))
+            self.stdscr.addstr(self.start_y + len(self.menuItems)+7, self.start_x_title, 'NIC: {}'.format(LOCALIFACE))
+            self.stdscr.addstr(self.start_y + len(self.menuItems)+8, self.start_x_title, 'IP: {}'.format(LOCALIP))
+            self.stdscr.addstr(self.start_y + len(self.menuItems)+9, self.start_x_title, 'MAC: {}'.format(REQUESTMAC))
 
             self.stdscr.addstr(self.start_y + len(self.menuItems)+11, self.start_x_title, '-' * len(self.subtitle))
             self.stdscr.addstr(self.start_y + len(self.menuItems)+12, self.start_x_title, self.subtitle)
@@ -404,20 +404,7 @@ def configuration():
             exit(1)
     return args
  
-ASCIITITLE= \
-"""
-    ___        ___   ___     
-   /   \/\  /\/ __\ / _ \    
-  / /\ / /_/ / /   / /_)/    
- / /_// __  / /___/ ___/     
-/___,'\/ /_/\____/\/         
-                             
- _____          _            
-/__   \___  ___| |_ ___ _ __ 
-  / /\/ _ \/ __| __/ _ \ '__|
- / / |  __/\__ \ ||  __/ |   
- \/   \___||___/\__\___|_|                               
-"""    
+  
 # configuration constants
 REGEX_IP=r'^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$'
 REGEX_MAC=r'^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$'
@@ -430,6 +417,20 @@ LOCALMAC = get_if_hwaddr(LOCALIFACE)
 LOCALMACRAW = bytes.fromhex(REQUESTMAC.replace(':',''))
 
 def main():
+    ASCIITITLE= \
+"""
+    ___        ___   ___     
+   /   \/\  /\/ __\ / _ \    
+  / /\ / /_/ / /   / /_)/    
+ / /_// __  / /___/ ___/     
+/___,'\/ /_/\____/\/         
+                             
+ _____          _            
+/__   \___  ___| |_ ___ _ __ 
+  / /\/ _ \/ __| __/ _ \ '__|
+ / / |  __/\__ \ ||  __/ |   
+ \/   \___||___/\__\___|_|                               
+"""  
     while 1:
         menuObj = Menu(['DHCP Starve', 'DHCP Spoof', 'DHCP Discover', 'Sniff for DHCP Packets'])
         
