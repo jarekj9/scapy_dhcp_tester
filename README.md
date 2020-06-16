@@ -52,7 +52,9 @@ Display DHCP options for every DHCP packet it sees.
 1. DHCP server with ip ```172.18.1.10``` and pool ```172.18.1.20 - 172.18.1.50```
 2. Machine with ```dhcpTester.py```, with ip ```172.18.1.11``` -> can test on the DHCP server
 
-
+---
+16.06.2020 - v0.91 fixed crash for small terminals
+10.03.2020 - v0.90 published
 
 
 

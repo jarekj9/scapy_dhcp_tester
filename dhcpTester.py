@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-from argparse import ArgumentParser
+from argparse import ArgumentParser,Namespace
 from scapy.all import sniff,sendp,Ether,get_if_hwaddr,IP,UDP,BOOTP,DHCP,RandString,RandInt
 from threading import Thread, Event
 from time import sleep
 from datetime import datetime
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address,IPv4Network
 import curses
 import os
 import socket, struct
@@ -151,6 +151,10 @@ class DhcpStarve:
         
     def dhcpack(self,srcIP,client_ip,mask,requestPkt):
         '''Generate DHCP request packet'''
+        
+        net = IPv4Network(srcIP + '/' + mask, False)
+        broadcastIP = str(net.broadcast_address)
+        
         dhcpack = Ether(src=LOCALMAC, dst=requestPkt[Ether].src)
         dhcpack/= IP(src=srcIP, dst='255.255.255.255')
         dhcpack/= UDP(dport=68, sport=67)
@@ -166,7 +170,7 @@ class DhcpStarve:
                                  ("renewal_time", 21600),
                                  ("rebinding_time", 37800),                                   
                                  ("subnet_mask", mask),
-                                 ("broadcast_address", "192.168.56.255"),
+                                 ("broadcast_address", broadcastIP),
                                  ("router", srcIP),
                                  ('name_server',srcIP),
                                   "end"])
@@ -197,8 +201,12 @@ class Menu:
         self.title = "Testing tool based on Scapy"
         self.menuItemsHint = "Choose an option or press q to quit:"
         self.menuItems = menuItems
-        self.subtitle = "v0.9 , github.com/jarekj9/scapy_dhcp_tester"
-        curses.wrapper(self.draw_menu)
+        self.subtitle = "v0.91 , github.com/jarekj9/scapy_dhcp_tester"
+        try:
+            curses.wrapper(self.draw_menu)
+        except curses.error as e:
+            print(e,'\nMenu draw error\nIs terminal height > 20 and width > 65 ?')
+            os._exit(0)
         
     def draw_menu(self,stdscr):
         '''Draws menu with curses'''
@@ -221,7 +229,7 @@ class Menu:
         # Initialization
         self.stdscr.clear()
         height, width = self.stdscr.getmaxyx()
-
+        #import pdb; pdb.set_trace()
 
         while (key != ord('q')): 
             # Centering calculations
@@ -241,9 +249,10 @@ class Menu:
             if   key == 10 and self.menuHighlight == 3:                     
                 self.choose_sniffing()       
                 
-            #print big ascii title
-            for y, line in enumerate(ASCIITITLE.splitlines(), 2):
-                self.stdscr.addstr(self.start_y+y, self.start_x_title-35, line)
+            #print big ascii title if screen is big enough
+            if height > 20 and width > 110:
+                for y, line in enumerate(ASCIITITLE.splitlines(), 2):
+                    self.stdscr.addstr(self.start_y+y, self.start_x_title-35, line)
 
             # print texts
             self.stdscr.attron(curses.color_pair(2))
@@ -386,7 +395,8 @@ def configuration():
     parser.add_argument('--ip',  default=network_data.get('ip'),  help='Local interface IP address, example: 192.168.1.10')
     parser.add_argument('--mac', default=network_data.get('mac'), help='Local interface MAC address, example: 84:3a:4b:23:cb:3c')
     args = parser.parse_args()
-    
+
+    print(args)
     for arg in vars(args).values():
         if not arg:
             print('\nFailed to autodetect network nic name, mac, ip.\n'+
@@ -404,20 +414,7 @@ def configuration():
             exit(1)
     return args
  
-  
-# configuration constants
-REGEX_IP=r'^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$'
-REGEX_MAC=r'^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$'
-arguments = configuration()
-LOCALIFACE = arguments.dev
-REQUESTMAC = arguments.mac
-LOCALIP = arguments.ip
-MYHOSTNAME='host'
-LOCALMAC = get_if_hwaddr(LOCALIFACE)
-LOCALMACRAW = bytes.fromhex(REQUESTMAC.replace(':',''))
-
-def main():
-    ASCIITITLE= \
+ASCIITITLE= \
 """
     ___        ___   ___     
    /   \/\  /\/ __\ / _ \    
@@ -430,7 +427,21 @@ def main():
   / /\/ _ \/ __| __/ _ \ '__|
  / / |  __/\__ \ ||  __/ |   
  \/   \___||___/\__\___|_|                               
-"""  
+"""    
+# configuration constants
+REGEX_IP=r'^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$'
+REGEX_MAC=r'^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$'
+if __name__ == '__main__': arguments = configuration()
+else                     : arguments = Namespace(dev='wlo1', ip='192.168.31.23', mac='84:3a:4b:23:cb:3c')  #for pytest
+LOCALIFACE = arguments.dev
+REQUESTMAC = arguments.mac
+LOCALIP = arguments.ip
+MYHOSTNAME='host'
+LOCALMAC = get_if_hwaddr(LOCALIFACE)
+LOCALMACRAW = bytes.fromhex(REQUESTMAC.replace(':',''))
+
+
+def main():
     while 1:
         menuObj = Menu(['DHCP Starve', 'DHCP Spoof', 'DHCP Discover', 'Sniff for DHCP Packets'])
         
