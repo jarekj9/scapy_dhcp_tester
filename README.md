@@ -54,6 +54,7 @@ Display DHCP options for every DHCP packet it sees.
 
 ---
 16.06.2020 - v0.91 fixed crash for small terminals
+
 10.03.2020 - v0.90 published
 
 
